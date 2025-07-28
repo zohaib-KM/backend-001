@@ -29,6 +29,18 @@ const Post = require('../models/Post');
 router.post('/', async (req, res) => {
   try {
     const post = await Post.create(req.body);
+    
+    // Get Socket.IO instance and emit notification
+    const io = req.app.get('io');
+    io.emit('newPost', {
+      message: 'A new post has been created!',
+      post: {
+        id: post._id,
+        title: post.title,
+        author: post.author
+      }
+    });
+    
     res.status(201).json(post);
   } catch (err) {
     res.status(400).json({ error: err.message });

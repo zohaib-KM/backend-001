@@ -1,0 +1,133 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>WebSocket Test</title>
+    <script src="/socket.io/socket.io.js"></script>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            max-width: 800px;
+            margin: 0 auto;
+            padding: 20px;
+        }
+        .notification {
+            background-color: #4CAF50;
+            color: white;
+            padding: 15px;
+            margin: 10px 0;
+            border-radius: 5px;
+            display: none;
+        }
+        .post-form {
+            background-color: #f5f5f5;
+            padding: 20px;
+            border-radius: 5px;
+            margin-bottom: 20px;
+        }
+        input, textarea, button {
+            margin: 5px 0;
+            padding: 10px;
+            width: 100%;
+            box-sizing: border-box;
+        }
+        button {
+            background-color: #008CBA;
+            color: white;
+            border: none;
+            cursor: pointer;
+        }
+        button:hover {
+            background-color: #007B9A;
+        }
+    </style>
+</head>
+<body>
+    <h1>WebSocket Notification Test</h1>
+    
+    <div class="post-form">
+        <h3>Create a New Post</h3>
+        <input type="text" id="title" placeholder="Post Title" required>
+        <textarea id="content" placeholder="Post Content" rows="4" required></textarea>
+        <button onclick="createPost()">Create Post</button>
+    </div>
+
+    <div id="notification" class="notification">
+        <h4>New Post Notification</h4>
+        <p id="notification-message"></p>
+    </div>
+
+    <div id="status">
+        <p>WebSocket Status: <span id="connection-status">Connecting...</span></p>
+    </div>
+
+    <script>
+        // Connect to Socket.IO
+        const socket = io();
+        
+        // Connection status
+        socket.on('connect', () => {
+            document.getElementById('connection-status').textContent = 'Connected';
+            document.getElementById('connection-status').style.color = 'green';
+        });
+        
+        socket.on('disconnect', () => {
+            document.getElementById('connection-status').textContent = 'Disconnected';
+            document.getElementById('connection-status').style.color = 'red';
+        });
+
+        // Listen for new post notifications
+        socket.on('newPost', (data) => {
+            console.log('New post notification received:', data);
+            
+            const notification = document.getElementById('notification');
+            const message = document.getElementById('notification-message');
+            
+            message.textContent = `${data.message} Title: ${data.post.title}`;
+            notification.style.display = 'block';
+            
+            // Hide notification after 5 seconds
+            setTimeout(() => {
+                notification.style.display = 'none';
+            }, 5000);
+        });
+
+        // Function to create a post
+        async function createPost() {
+            const title = document.getElementById('title').value;
+            const content = document.getElementById('content').value;
+            
+            if (!title || !content) {
+                alert('Please fill in both title and content');
+                return;
+            }
+
+            try {
+                const response = await fetch('/api/posts', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                    },
+                    body: JSON.stringify({
+                        title: title,
+                        content: content,
+                        author: '64f1234567890abcdef12345' // Replace with actual user ID
+                    })
+                });
+
+                if (response.ok) {
+                    document.getElementById('title').value = '';
+                    document.getElementById('content').value = '';
+                    alert('Post created successfully!');
+                } else {
+                    alert('Error creating post');
+                }
+            } catch (error) {
+                console.error('Error:', error);
+                alert('Error creating post');
+            }
+        }
+    </script>
+</body>
+</html> 
