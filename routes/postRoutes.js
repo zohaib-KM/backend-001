@@ -13,7 +13,34 @@ const Post = require('../models/Post');
  *       content:
  *         application/json:
  *           schema:
- *             $ref: '#/components/schemas/Post'
+ *             type: object
+ *             properties:
+ *               title:
+ *                 type: string
+ *                 description: The title of the post
+ *               content:
+ *                 type: string
+ *                 description: The content/body of the post
+ *               author:
+ *                 type: string
+ *                 description: The ID of the user who created the post
+ *               tags:
+ *                 type: array
+ *                 items:
+ *                   type: string
+ *                 description: Tags associated with the post
+ *               createdAt:
+ *                 type: string
+ *                 format: date-time
+ *                 description: The creation date of the post
+ *               updatedAt:
+ *                 type: string
+ *                 format: date-time
+ *                 description: The last update date of the post
+ *             required:
+ *               - title
+ *               - content
+ *               - author
  *     responses:
  *       201:
  *         description: Post created
