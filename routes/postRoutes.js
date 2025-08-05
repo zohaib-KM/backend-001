@@ -1,6 +1,22 @@
 const express = require('express');
 const router = express.Router();
 const Post = require('../models/Post');
+const { cache, invalidateCache } = require('../middleware/cache');
+
+// Simple validation function
+const validatePost = (data) => {
+  const errors = [];
+  if (!data.title || data.title.trim().length === 0) {
+    errors.push({ field: 'title', message: 'Title is required' });
+  }
+  if (!data.content || data.content.trim().length === 0) {
+    errors.push({ field: 'content', message: 'Content is required' });
+  }
+  if (!data.author) {
+    errors.push({ field: 'author', message: 'Author is required' });
+  }
+  return { isValid: errors.length === 0, errors };
+};
 
 /**
  * @swagger
@@ -53,7 +69,12 @@ const Post = require('../models/Post');
  *       200:
  *         description: List of posts
  */
-router.post('/', async (req, res) => {
+router.post('/', invalidateCache('cache:*posts*'), async (req, res) => {
+  const validation = validatePost(req.body);
+  if (!validation.isValid) {
+    return res.status(400).json({ error: validation.errors });
+  }
+
   try {
     const post = await Post.create(req.body);
     
@@ -90,16 +111,27 @@ router.post('/', async (req, res) => {
  *       200:
  *         description: Post found
  */
-// Get all posts
-router.get('/', async (req, res) => {
-  const posts = await Post.find().populate('author', 'name email');
-  res.json(posts);
+// Get all posts with caching
+router.get('/', cache(300), async (req, res) => {
+  try {
+    const posts = await Post.find().populate('author', 'name email');
+    res.json(posts);
+  } catch (err) {
+    res.status(400).json({ error: err.message });
+  }
 });
 
-// Get post by ID
-router.get('/:id', async (req, res) => {
-  const post = await Post.findById(req.params.id).populate('author');
-  res.json(post);
+// Get post by ID with caching
+router.get('/:id', cache(600), async (req, res) => {
+  try {
+    const post = await Post.findById(req.params.id).populate('author');
+    if (!post) {
+      return res.status(404).json({ error: 'Post not found' });
+    }
+    res.json(post);
+  } catch (err) {
+    res.status(400).json({ error: err.message });
+  }
 });
 
 module.exports = router;

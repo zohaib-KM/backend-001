@@ -1,6 +1,7 @@
 const express = require('express');
 const router = express.Router();
 const Comment = require('../models/Comment');
+const { cache, invalidateCache } = require('../middleware/cache');
 
 /**
  * @swagger
@@ -21,10 +22,11 @@ const Comment = require('../models/Comment');
  *         description: Bad request
  */
 // Create comment
-router.post('/', async (req, res) => {
+router.post('/', invalidateCache('cache:*comments*'), async (req, res) => {
   try {
     const comment = await Comment.create(req.body);
-    res.status(201).json(comment);
+    const populatedComment = await Comment.findById(comment._id).populate('user', 'name');
+    res.status(201).json(populatedComment);
   } catch (err) {
     res.status(400).json({ error: err.message });
   }
@@ -46,10 +48,14 @@ router.post('/', async (req, res) => {
  *       200:
  *         description: List of comments
  */
-// Get comments by post ID
-router.get('/post/:postId', async (req, res) => {
-  const comments = await Comment.find({ post: req.params.postId }).populate('user', 'name');
-  res.json(comments);
+// Get comments by post ID with caching
+router.get('/post/:postId', cache(300), async (req, res) => {
+  try {
+    const comments = await Comment.find({ post: req.params.postId }).populate('user', 'name');
+    res.json(comments);
+  } catch (err) {
+    res.status(400).json({ error: err.message });
+  }
 });
 
 module.exports = router;

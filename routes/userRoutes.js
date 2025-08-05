@@ -2,6 +2,7 @@ const express = require('express');
 const router = express.Router();
 const User = require('../models/User');
 const auth = require('./authMiddleware');
+const { cache, invalidateCache } = require('../middleware/cache');
 
 /**
  * @swagger
@@ -33,10 +34,12 @@ const auth = require('./authMiddleware');
  *       401:
  *         description: Unauthorized
  */
-router.post('/', auth, async (req, res) => {
+router.post('/', auth, invalidateCache('cache:*users*'), async (req, res) => {
   try {
     const user = await User.create(req.body);
-    res.status(201).json(user);
+    // Remove password from response
+    const { password, ...userResponse } = user.toObject();
+    res.status(201).json(userResponse);
   } catch (err) {
     res.status(400).json({ error: err.message });
   }
@@ -100,16 +103,20 @@ router.post('/', auth, async (req, res) => {
  *       400:
  *         description: Bad request
  */
-// Read All
-router.get('/', auth, async (req, res) => {
-  const users = await User.find();
-  res.json(users);
+// Read All with caching
+router.get('/', auth, cache(300), async (req, res) => {
+  try {
+    const users = await User.find().select('-password');
+    res.json(users);
+  } catch (err) {
+    res.status(400).json({ error: err.message });
+  }
 });
 
-// Read One
-router.get('/:id', auth, async (req, res) => {
+// Read One with caching
+router.get('/:id', auth, cache(600), async (req, res) => {
   try {
-    const user = await User.findById(req.params.id);
+    const user = await User.findById(req.params.id).select('-password');
     if (!user) return res.status(404).json({ error: 'User not found' });
     res.json(user);
   } catch (err) {
@@ -118,9 +125,10 @@ router.get('/:id', auth, async (req, res) => {
 });
 
 // Update
-router.put('/:id', auth, async (req, res) => {
+router.put('/:id', auth, invalidateCache('cache:*users*'), async (req, res) => {
   try {
-    const updated = await User.findByIdAndUpdate(req.params.id, req.body, { new: true });
+    const updated = await User.findByIdAndUpdate(req.params.id, req.body, { new: true }).select('-password');
+    if (!updated) return res.status(404).json({ error: 'User not found' });
     res.json(updated);
   } catch (err) {
     res.status(400).json({ error: err.message });
@@ -128,9 +136,10 @@ router.put('/:id', auth, async (req, res) => {
 });
 
 // Delete
-router.delete('/:id', auth, async (req, res) => {
+router.delete('/:id', auth, invalidateCache('cache:*users*'), async (req, res) => {
   try {
-    await User.findByIdAndDelete(req.params.id);
+    const deleted = await User.findByIdAndDelete(req.params.id);
+    if (!deleted) return res.status(404).json({ error: 'User not found' });
     res.json({ message: 'User deleted' });
   } catch (err) {
     res.status(400).json({ error: err.message });

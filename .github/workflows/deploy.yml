@@ -1,0 +1,79 @@
+name: Deploy to Development Server
+
+on:
+  push:
+    branches: [main]
+
+jobs:
+  deploy:
+    name: Deploying to Development Server
+    runs-on: [self-hosted, be-practice-vm]
+    environment: development
+    
+    env:
+      PROJECT_NAME: testapp
+      HOST_PORT: 2828
+      COMPOSE_PROJECT_NAME: testapp-stack
+      
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          clean: false
+          
+      - name: Create environment file
+        run: |
+          cat > .env << EOF
+          MONGODB_URI=${{ secrets.MONGODB_URI }}
+          PORT=5000
+          JWT_SECRET=${{ secrets.JWT_SECRET }}
+          REDIS_URL=redis://redis:6379
+          EOF
+          
+      - name: Stop existing services
+        run: |
+          docker-compose -p $COMPOSE_PROJECT_NAME down || true
+          
+      - name: Remove old images
+        run: |
+          docker image prune -f
+          docker rmi $(docker images "$PROJECT_NAME*" -q) 2>/dev/null || true
+          
+      - name: Build and start services
+        run: |
+          docker-compose -p $COMPOSE_PROJECT_NAME up -d --build
+          
+      - name: Wait for services to be ready
+        run: |
+          echo "Waiting for services to start..."
+          sleep 30
+          
+          # Check if app is responding
+          for i in {1..10}; do
+            if curl -f http://localhost:$HOST_PORT/health; then
+              echo "✅ Application is healthy!"
+              break
+            else
+              echo "⏳ Waiting for application... (attempt $i/10)"
+              sleep 10
+            fi
+          done
+          
+      - name: View service status
+        run: |
+          echo "=== Docker Compose Services ==="
+          docker-compose -p $COMPOSE_PROJECT_NAME ps
+          
+          echo "=== Application Health Check ==="
+          curl -s http://localhost:$HOST_PORT/health | jq '.' || echo "Health check failed"
+          
+          echo "=== Redis Status ==="
+          docker-compose -p $COMPOSE_PROJECT_NAME exec -T redis redis-cli ping || echo "Redis check failed"
+          
+          echo "=== Application Logs (last 20 lines) ==="
+          docker-compose -p $COMPOSE_PROJECT_NAME logs --tail=20 app
+          
+      - name: Clean up unused resources
+        run: |
+          docker system prune -f --volumes
+          docker image prune -a -f
