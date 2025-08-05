@@ -32,7 +32,7 @@ jobs:
           
       - name: Stop existing services
         run: |
-          docker-compose -p $COMPOSE_PROJECT_NAME down || true
+          docker compose -p $COMPOSE_PROJECT_NAME down || true
           
       - name: Remove old images
         run: |
@@ -41,7 +41,7 @@ jobs:
           
       - name: Build and start services
         run: |
-          docker-compose -p $COMPOSE_PROJECT_NAME up -d --build
+          docker compose -p $COMPOSE_PROJECT_NAME up -d --build
           
       - name: Wait for services to be ready
         run: |
@@ -62,16 +62,16 @@ jobs:
       - name: View service status
         run: |
           echo "=== Docker Compose Services ==="
-          docker-compose -p $COMPOSE_PROJECT_NAME ps
+          docker compose -p $COMPOSE_PROJECT_NAME ps
           
           echo "=== Application Health Check ==="
           curl -s http://localhost:$HOST_PORT/health | jq '.' || echo "Health check failed"
           
           echo "=== Redis Status ==="
-          docker-compose -p $COMPOSE_PROJECT_NAME exec -T redis redis-cli ping || echo "Redis check failed"
+          docker compose -p $COMPOSE_PROJECT_NAME exec -T redis redis-cli ping || echo "Redis check failed"
           
           echo "=== Application Logs (last 20 lines) ==="
-          docker-compose -p $COMPOSE_PROJECT_NAME logs --tail=20 app
+          docker compose -p $COMPOSE_PROJECT_NAME logs --tail=20 app
           
       - name: Clean up unused resources
         run: |
